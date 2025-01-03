@@ -58,8 +58,8 @@ func (r *OrderRepository) CreateOrder(ctx context.Context, order *entity.Order) 
 	}
 
 	// Insert order
-	orderQuery := `INSERT INTO orders (user_id, order_id, quantity, total, status, total_mark_up, total_discount) VALUES (?, ?, ?, ?, ?, ?, ?)`
-	res, err := tx.ExecContext(ctx, orderQuery, order.UserID, order.OrderID, order.Quantity, order.Total, order.Status, order.TotalMarkUp, order.TotalDiscount)
+	orderQuery := `INSERT INTO orders (user_id, order_id, quantity, total, status, total_mark_up, total_discount, idempotent_key) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+	res, err := tx.ExecContext(ctx, orderQuery, order.UserID, order.OrderID, order.Quantity, order.Total, order.Status, order.TotalMarkUp, order.TotalDiscount, order.IdempotentKey)
 	if err != nil {
 		tx.Rollback()
 		return nil, err

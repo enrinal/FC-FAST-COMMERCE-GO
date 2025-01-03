@@ -2,20 +2,33 @@ package main
 
 import (
 	"database/sql"
-	echojwt "github.com/labstack/echo-jwt/v4"
+	"github.com/go-redis/redis/v8"
+	_ "github.com/go-sql-driver/mysql" // Import MySQL driver
 	"github.com/labstack/echo/v4"
 	"github.com/labstack/echo/v4/middleware"
 	"golang.org/x/time/rate"
+	"log"
 	"order-service/internal/api"
 	"order-service/internal/config"
 	"order-service/internal/repository"
 	"order-service/internal/service"
 	"order-service/internal/sharding"
+	"order-service/migrations"
+	"os"
 	"time"
 )
 
 func connectDB() (*sql.DB, error) {
 	db, err := sql.Open("mysql", "root:@tcp(127.0.0.1:3306)/order-db")
+	if err != nil {
+		return nil, err
+	}
+	return db, nil
+}
+
+func connectDBEnv(host, port, user, pass, dbname string) (*sql.DB, error) {
+	dsn := user + ":" + pass + "@tcp(" + host + ":" + port + ")/" + dbname
+	db, err := sql.Open("mysql", dsn)
 	if err != nil {
 		return nil, err
 	}
@@ -28,27 +41,59 @@ func main() {
 	//	panic(err)
 	//}
 
-	db1, err := sql.Open("mysql", "root:@tcp(localhost:3306)/order-db-1")
+	//db1, err := sql.Open("mysql", "root:@tcp(localhost:3306)/order-db-1")
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
+	//db2, err := sql.Open("mysql", "root:@tcp(localhost:3306)/order-db-2")
+	//if err != nil {
+	//	panic(err)
+	//}
+	//
+	//db3, err := sql.Open("mysql", "root:@tcp(localhost:3306)/order-db-3")
+	//if err != nil {
+	//	panic(err)
+	//}
+
+	db1, err := connectDBEnv(os.Getenv("DB1_HOST"), os.Getenv("DB1_PORT"), os.Getenv("DB1_USER"), os.Getenv("DB1_PASS"), os.Getenv("DB1_NAME"))
+	if err != nil {
+		panic(err)
+	}
+	db2, err := connectDBEnv(os.Getenv("DB2_HOST"), os.Getenv("DB2_PORT"), os.Getenv("DB2_USER"), os.Getenv("DB2_PASS"), os.Getenv("DB2_NAME"))
+	if err != nil {
+		panic(err)
+	}
+	db3, err := connectDBEnv(os.Getenv("DB3_HOST"), os.Getenv("DB3_PORT"), os.Getenv("DB3_USER"), os.Getenv("DB3_PASS"), os.Getenv("DB3_NAME"))
 	if err != nil {
 		panic(err)
 	}
 
-	db2, err := sql.Open("mysql", "root:@tcp(localhost:3306)/order-db-2")
+	// Migrate tables
+	err = migrations.AutoMigrateOrders(3, db1, db2, db3)
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to migrate orders table: %v", err)
 	}
 
-	db3, err := sql.Open("mysql", "root:@tcp(localhost:3306)/order-db-3")
+	err = migrations.AutoMigrateProductRequests(3, db1, db2, db3)
 	if err != nil {
-		panic(err)
+		log.Fatalf("Failed to migrate product_requests table: %v", err)
 	}
+
+	//rdb := redis.NewClient(&redis.Options{
+	//	Addr: "localhost:6379",
+	//})
+
+	rdb := redis.NewClient(&redis.Options{
+		Addr: os.Getenv("REDIS_ADDR"),
+	})
 
 	kafkaWriter := config.NewKafkaWriter("order-topic")
 
 	router := sharding.NewShardRouter(3)
 
 	orderRepo := repository.NewOrderRepository([]*sql.DB{db1, db2, db3}, router)
-	orderService := service.NewOrderService(*orderRepo, "http://localhost:8081", "http://localhost:8083", kafkaWriter)
+	orderService := service.NewOrderService(*orderRepo, "http://localhost:8081", "http://localhost:8083", kafkaWriter, rdb)
 	orderHandler := api.NewOrderHandler(*orderService)
 
 	e := echo.New()
@@ -79,7 +124,7 @@ func main() {
 	// Middleware
 	e.Use(middleware.Logger())
 	e.Use(middleware.Recover())
-	e.Use(echojwt.JWT([]byte("secret")))
+	//e.Use(echojwt.JWT([]byte("secret"))) // uncomment this line to enable JWT middleware
 	e.Use(middleware.RateLimiterWithConfig(limiterConfig))
 
 	e.POST("/orders", orderHandler.CreateOrder)

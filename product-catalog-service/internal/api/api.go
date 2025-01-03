@@ -63,3 +63,20 @@ func (ph *ProductHandler) ReleaseProductStock(c echo.Context) error {
 
 	return c.JSON(200, map[string]string{"message": "Stock released"})
 }
+
+// PreWarmupCache pre-warms the cache with product data --> /products/warmup-cache
+func (ph *ProductHandler) PreWarmupCache(c echo.Context) error {
+	//// call synchronously
+	//err := ph.productService.PreWarmCache(c.Request().Context())
+	//if err != nil {
+	//	return c.JSON(500, map[string]string{"error": err.Error()})
+	//}
+
+	// call asynchrously
+	err := ph.productService.PreWarmCacheAsync(c.Request().Context())
+	if err != nil {
+		return c.JSON(500, map[string]string{"error": err.Error()})
+	}
+
+	return c.JSON(200, map[string]string{"message": "Cache pre-warmed"})
+}

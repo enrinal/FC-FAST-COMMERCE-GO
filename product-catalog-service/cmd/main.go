@@ -78,6 +78,7 @@ func main() {
 	e.GET("/products/:id/stock", productHandler.GetProductStock)
 	e.POST("/products/reserve", productHandler.ReserveProductStock)
 	e.POST("/products/release", productHandler.ReleaseProductStock)
+	e.GET("/products/warmup-cache", productHandler.PreWarmupCache)
 
 	// Start server
 	e.Logger.Fatal(e.Start(":8081"))

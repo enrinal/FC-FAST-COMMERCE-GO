@@ -1,0 +1,99 @@
+version: '3.8'
+
+services:
+  db1:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: order-db-1
+    ports:
+      - "3307:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
+
+  db2:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: order-db-2
+    ports:
+      - "3308:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
+
+  db3:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: rootpassword
+      MYSQL_DATABASE: order-db-3
+    ports:
+      - "3309:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      retries: 5
+      timeout: 5s
+
+  redis:
+    image: redis:6.2
+    ports:
+      - "6379:6379"
+
+  kafka:
+    image: confluentinc/cp-kafka:7.2.1
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+    ports:
+      - "9092:9092"
+    depends_on:
+      - zookeeper
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.2.1
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+    ports:
+      - "2181:2181"
+
+  order-service:
+    build: .
+    ports:
+      - "8082:8082"
+    environment:
+      - ENV=test
+      - DB1_HOST=db1
+      - DB1_PORT=3306
+      - DB1_USER=root
+      - DB1_PASS=rootpassword
+      - DB1_NAME=order-db-1
+      - DB2_HOST=db2
+      - DB2_PORT=3306
+      - DB2_USER=root
+      - DB2_PASS=rootpassword
+      - DB2_NAME=order-db-2
+      - DB3_HOST=db3
+      - DB3_PORT=3306
+      - DB3_USER=root
+      - DB3_PASS=rootpassword
+      - DB3_NAME=order-db-3
+      - REDIS_ADDR=redis:6379
+      - KAFKA_BROKER=kafka:9092
+      - JWT_SECRET=secret
+    depends_on:
+      db1:
+        condition: service_healthy
+      db2:
+        condition: service_healthy
+      db3:
+        condition: service_healthy
+      kafka:
+        condition: service_started

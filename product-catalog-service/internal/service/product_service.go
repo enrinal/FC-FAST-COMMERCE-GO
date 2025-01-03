@@ -10,6 +10,7 @@ import (
 	"os"
 	"product-catalog-service/internal/entity"
 	"product-catalog-service/internal/repository"
+	"time"
 )
 
 var logger = zerolog.New(os.Stdout).With().Timestamp().Logger()
@@ -174,6 +175,46 @@ func (p *ProductService) ReleaseProductStock(ctx context.Context, productID int,
 	err = p.rdb.Set(ctx, key, productData, 0).Err()
 	if err != nil {
 		logger.Error().Err(err).Msgf("Error setting product %d in cache", productID)
+	}
+
+	return nil
+}
+
+// PreWarmCache pre-warms the cache with product data.
+func (p *ProductService) PreWarmCache(ctx context.Context) error {
+	products, err := p.productRepo.GetProducts(ctx)
+	if err != nil {
+		logger.Error().Err(err).Msg("Error getting products")
+		return err
+	}
+
+	for _, product := range products {
+		key := fmt.Sprintf("product:%d", product.ID)
+		err := p.rdb.Set(ctx, key, product, 1*time.Minute).Err()
+		if err != nil {
+			logger.Error().Err(err).Msgf("Error setting product %d in cache", product.ID)
+		}
+	}
+
+	return nil
+}
+
+// PreWarmCacheAsync pre-warms the cache with product data asynchronously.
+func (p *ProductService) PreWarmCacheAsync(ctx context.Context) error {
+	products, err := p.productRepo.GetProducts(ctx)
+	if err != nil {
+		logger.Error().Err(err).Msg("Error getting products")
+		return err
+	}
+
+	for _, product := range products {
+		go func(product entity.Product) {
+			key := fmt.Sprintf("product:%d", product.ID)
+			err := p.rdb.Set(ctx, key, product, 1*time.Minute).Err()
+			if err != nil {
+				logger.Error().Err(err).Msgf("Error setting product %d in cache", product.ID)
+			}
+		}(*product)
 	}
 
 	return nil

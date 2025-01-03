@@ -21,6 +21,7 @@ func (h *OrderHandler) CreateOrder(c echo.Context) error {
 	if err := c.Bind(&order); err != nil {
 		return c.JSON(400, map[string]string{"error": "Invalid request payload"})
 	}
+	order.IdempotentKey = c.Request().Header.Get("Idempotent-Key")
 
 	createdOrder, err := h.orderService.CreateOrder(ctx, &order)
 	if err != nil {

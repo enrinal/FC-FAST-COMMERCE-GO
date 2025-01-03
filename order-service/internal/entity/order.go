@@ -10,6 +10,7 @@ type Order struct {
 	TotalMarkUp     float64          `json:"total_mark_up"`
 	TotalDiscount   float64          `json:"total_discount"`
 	Status          string           `json:"status"` // e.g., "created", "paid", "canceled"
+	IdempotentKey   string           `json:"idempotent_key"`
 }
 
 type ProductRequest struct {
@@ -26,12 +27,7 @@ Mysql Table
 CREATE TABLE orders (
 	id INT AUTO_INCREMENT PRIMARY KEY,
 	user_id INT NOT NULL,
-	quantity INT NOT NULL,
-	total DOUBLE NOT NULL,
-	status VARCHAR(50) NOT NULL,
-	total_mark_up DOUBLE NOT NULL,
-	total_discount DOUBLE NOT NULL
-);
+
 
 CREATE TABLE product_requests (
 	id INT AUTO_INCREMENT PRIMARY KEY,
